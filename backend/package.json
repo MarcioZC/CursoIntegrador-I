@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "test": "jest --detectOpenHandles"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +16,15 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-validator": "^7.2.1",
-    "mysql2": "^3.14.1"
+    "mysql2": "^3.14.1",
+    "mysqldump": "^3.2.0",
+    "node-cron": "^4.2.1"
+  },
+  "devDependencies": {
+    "chai": "^5.2.1",
+    "chai-http": "^5.1.2",
+    "jest": "^30.0.4",
+    "mocha": "^11.7.1",
+    "supertest": "^7.1.3"
   }
 }
