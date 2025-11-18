@@ -4,15 +4,15 @@ const db = require("../db");
 
 // Ruta para registrar un nuevo usuario
 router.post("/register", async (req, res) => {
-  const { nombre, apellido, correo, contraseña, telefono, direccion } = req.body;
+  const { nombre, apellido, correo, contrasena, telefono, direccion } = req.body;
 
   const sql = `
-    INSERT INTO usuario (nombre, apellido, correo, contraseña, telefono, direccion)
+    INSERT INTO usuario (nombre, apellido, correo, contrasena, telefono, direccion)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
 
   try {
-    const [result] = await db.query(sql, [nombre, apellido, correo, contraseña, telefono, direccion]);
+    const [result] = await db.query(sql, [nombre, apellido, correo, contrasena, telefono, direccion]);
     res.status(201).send("✅ Usuario registrado correctamente");
   } catch (err) {
     console.error("❌ Error al registrar usuario:", err);
@@ -22,9 +22,9 @@ router.post("/register", async (req, res) => {
 
 // Ruta para login
 router.post('/login', async (req, res) => {
-  const { correo, contraseña } = req.body;
+  const { correo, contrasena } = req.body;
 
-  if (!correo || !contraseña) {
+  if (!correo || !contrasena) {
     return res.status(400).json({ message: 'Faltan campos obligatorios' });
   }
 
@@ -37,12 +37,12 @@ router.post('/login', async (req, res) => {
 
     const usuario = rows[0];
 
-    if (usuario.contraseña !== contraseña) {
-      return res.status(401).json({ message: 'Contraseña incorrecta' });
+    if (usuario.contrasena !== contrasena) {
+      return res.status(401).json({ message: 'contrasena incorrecta' });
     }
 
-    const { contraseña: _, ...usuarioSinContraseña } = usuario;
-    res.json({ message: 'Inicio de sesión exitoso', usuario: usuarioSinContraseña });
+    const { contrasena: _, ...usuarioSincontrasena } = usuario;
+    res.json({ message: 'Inicio de sesión exitoso', usuario: usuarioSincontrasena });
 
   } catch (error) {
     console.error('Error al iniciar sesión:', error);
@@ -50,18 +50,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Obtener todos los productos
-router.get("/productos", async (req, res) => {
-  try {
-    const [productos] = await db.query(
-      "SELECT id_producto, nombre, precio, imagen FROM producto"
-    );
-    res.json(productos);
-  } catch (error) {
-    console.error("Error al obtener productos:", error);
-    res.status(500).json({ message: "Error al obtener productos" });
-  }
-});
 
 
 
