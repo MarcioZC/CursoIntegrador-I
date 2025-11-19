@@ -1,11 +1,18 @@
 "use client";
 
 import { Sidebar } from "@/components/sidebar"; 
-import { withAuth } from "@/components/withAuth";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSession, signIn } from "next-auth/react"; // ✅ Importar NextAuth
+import { useRouter } from "next/navigation";
 import { PlusCircle, DollarSign, FileText } from "lucide-react";
+import { useCategorias } from "@/hooks/useApi";
+import { apiService } from "@/services/apiService";
+import { withAuth } from "@/components/withAuth";
 
 function RegistrarPage() {
+  const { data: session, status } = useSession(); // ✅ Obtener sesión
+  const router = useRouter();
+  
   const [formData, setFormData] = useState({
     tipo: "",
     idCategoria: "",
@@ -16,24 +23,23 @@ function RegistrarPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Categorías de ejemplo basadas en tu modelo
-  const categorias = {
-    ingreso: [
-      { id: 1, nombre: "Salario" },
-      { id: 2, nombre: "Freelance" },
-      { id: 3, nombre: "Inversiones" },
-      { id: 4, nombre: "Otros Ingresos" },
-    ],
-    gasto: [
-      { id: 5, nombre: "Alimentación" },
-      { id: 6, nombre: "Transporte" },
-      { id: 7, nombre: "Entretenimiento" },
-      { id: 8, nombre: "Servicios" },
-      { id: 9, nombre: "Salud" },
-      { id: 10, nombre: "Otros Gastos" },
-    ],
-  };
+  const { categorias, fetchCategorias, loading: isLoadingCategorias } = useCategorias();
+
+  // ✅ Manejar error de refresh token
+  useEffect(() => {
+    if (session?.error === "RefreshAccessTokenError") {
+      signIn(); // Forzar re-login si el refresh token falló
+    }
+  }, [session]);
+
+  // Fetch de categorías al montar el componente
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchCategorias();
+    }
+  }, [status]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -56,22 +62,21 @@ function RegistrarPage() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      // Aquí harías el POST a tu API endpoint
-      // const response = await fetch('/api/registros', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ...formData,
-      //     monto: parseFloat(formData.monto),
-      //     fechaCreacion: new Date().toISOString()
-      //   })
-      // });
+      const registroData = {
+        id_categoria: parseInt(formData.idCategoria),
+        tipo: formData.tipo,
+        descripcion: formData.descripcion,
+        monto: parseFloat(formData.monto),
+        fecha_registro: formData.fechaRegistro
+      };
 
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simular delay
+      // ✅ apiService ya incluye el token automáticamente
+      await apiService.post('/registros/usuario', registroData);
+
       setShowSuccess(true);
-
       setFormData({
         tipo: "",
         idCategoria: "",
@@ -80,9 +85,27 @@ function RegistrarPage() {
         fechaRegistro: new Date().toISOString().split("T")[0],
       });
 
-      setTimeout(() => setShowSuccess(false), 3000);
-    } catch (error) {
-      console.error("Error al guardar:", error);
+      // Mostrar mensaje corto y permanecer en la misma página (no redirigir)
+      setTimeout(() => {
+        setShowSuccess(false);
+        // Se eliminó la redirección a /dashboard para mantener al usuario en la página
+      }, 900);
+
+      // Notificar a otros componentes que los registros cambiaron (para actualizar balances en dashboard)
+      try {
+        window.dispatchEvent(new Event('registrosUpdated'));
+      } catch (e) {
+        // En entornos donde no exista `window` (SSR) se ignora
+      }
+      
+    } catch (err: any) {
+      // ✅ Manejar específicamente error 401 (no autenticado)
+      if (err.response?.status === 401) {
+        setError('Tu sesión expiró. Por favor, inicia sesión nuevamente.');
+        setTimeout(() => signIn(), 2000);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Error al guardar');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -107,8 +130,10 @@ function RegistrarPage() {
 
   return (
     <main className="font-sans text-gray-800 bg-black-50 min-h-screen">
-      <div className="flex">
-        <Sidebar />
+      <div className="flex flex-col sm:flex-row">
+        <div className="sm:w-64">
+          <Sidebar />
+        </div>
 
         <section className="flex-1 bg-gray-100 p-6">
           <h1 className="text-2xl font-bold mb-4">Nuevo Registro</h1>
@@ -206,18 +231,21 @@ function RegistrarPage() {
                     name="idCategoria"
                     value={formData.idCategoria}
                     onChange={handleInputChange}
-                    disabled={!formData.tipo}
+                    disabled={!formData.tipo || isLoadingCategorias}
                     className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed shadow-sm"
                   >
                     <option value="">
-                      {formData.tipo
+                      {isLoadingCategorias
+                        ? "Cargando categorías..."
+                        : formData.tipo
                         ? "Selecciona una categoría"
                         : "Primero selecciona el tipo"}
                     </option>
                     {formData.tipo &&
+                      !isLoadingCategorias &&
                       categorias[formData.tipo as keyof typeof categorias]?.map(
                         (categoria) => (
-                          <option key={categoria.id} value={categoria.id}>
+                          <option key={categoria.id_categoria} value={categoria.id_categoria}>
                             {categoria.nombre}
                           </option>
                         )
@@ -363,7 +391,7 @@ function RegistrarPage() {
                           {
                             [...categorias.ingreso, ...categorias.gasto].find(
                               (cat) =>
-                                cat.id.toString() === formData.idCategoria
+                                cat.id_categoria.toString() === formData.idCategoria
                             )?.nombre || "Sin categoría"
                           }
                         </p>
@@ -371,11 +399,9 @@ function RegistrarPage() {
                           <span className="font-semibold">Descripción:</span>{" "}
                           {formData.descripcion}
                         </p>
-                        <p>
+                          <p>
                           <span className="font-semibold">Fecha:</span>{" "}
-                          {new Date(formData.fechaRegistro).toLocaleDateString(
-                            "es-PE"
-                          )}
+                          {formData.fechaRegistro}
                         </p>
                       </div>
                     </div>

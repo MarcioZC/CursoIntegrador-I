@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,50 +10,31 @@ import { Input } from "@/components/ui/input";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
+    setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `http://localhost:4000/api/v1/auth/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            correo: email,
-            contraseña: password,
-          }),
-          credentials: "include", // importante si usas cookies o JWT
-        }
-      );
+      const result = await signIn("credentials", {
+        correo: email,
+        contraseña: password,
+        redirect: false,
+      });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (result?.error) {
+        setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+        setIsLoading(false);
+        return;
+      }
 
-        if (result.status === "success") {
-          // Guardar token - ajusta según tu backend
-          if (result.data.access_token) {
-            document.cookie = `token=${result.data.access_token}; path=/; max-age=86400`; // 1 día
-          }
-
-          // Redirigir al dashboard o ruta indicada
-          const redirectUrl = result.data.redirectTo || "/dashboard";
-          router.push(redirectUrl);
-        } else {
-          setError(result.message || "Error en el login");
-        }
-      } else {
-        // Manejar errores HTTP
-        const errorData = await response.json();
-        setError(errorData.message || `Error: ${response.status}`);
+      if (result?.ok) {
+        router.push("/dashboard"); // Redirige a tu página principal
+        router.refresh(); // Fuerza actualización de la sesión
       }
     } catch (error) {
       console.error("Error:", error);
@@ -63,8 +45,8 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="bg-blue-200 min-h-screen flex items-center justify-center pt-10 px-4">
-      <div className="relative z-10 bg-white/90 backdrop-blur-sm rounded-xl shadow-2xl p-8 w-full max-w-md">
+    <main className="bg-blue-200 min-h-screen flex items-center justify-center py-8 sm:py-16 px-4">
+      <div className="relative z-10 bg-white/90 backdrop-blur-sm rounded-xl shadow-2xl p-6 sm:p-8 w-full max-w-md mx-auto px-4 sm:px-6">
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Bienvenido de nuevo
         </h1>
